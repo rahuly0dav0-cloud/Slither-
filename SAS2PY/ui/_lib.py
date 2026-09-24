@@ -264,10 +264,10 @@ def sidebar_config() -> dict:
     st.sidebar.header("Options")
     _keep("cfg_max_attempts", 3)
     max_attempts = st.sidebar.slider("Max debug attempts per step", 1, 5, key="cfg_max_attempts")
-    _keep("cfg_use_v2", False)
+    _keep("cfg_use_v2", True)
     use_v2 = st.sidebar.checkbox(
-        "Augment with knowledge_v2", key="cfg_use_v2",
-        help="Append the structured rule cards for stats/modelling steps.",
+        "Use knowledge base", key="cfg_use_v2",
+        help="Apply approved rule cards so conversions follow your team's house style.",
     )
     _keep("cfg_use_learning", False)
     use_learning = st.sidebar.checkbox(
