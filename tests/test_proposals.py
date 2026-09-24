@@ -72,7 +72,11 @@ def test_draft_proposals_from_recovered_step(tmp_path):
     assert p["recovered"] is True
     assert p["attempts"] == 2
     assert p["first_error"]
-    assert p["fix_code"]  # the passing code is captured as the fix
+    assert p["hint"]  # concrete guidance for the error class
+    assert p["fix_diff"]  # the exact edit that fixed it, not the whole step
+    # the diff shows the join-type change the agent made to recover
+    joined = "\n".join(p["fix_diff"])
+    assert "how='inner'" in joined
 
 
 def test_infra_errors_are_not_proposed():
@@ -94,7 +98,7 @@ def test_real_conversion_error_still_proposed():
     proposals = draft_proposals(report)
     assert len(proposals) == 1
     assert proposals[0]["recovered"] is True
-    assert proposals[0]["fix_code"]
+    assert proposals[0]["fix_diff"]
 
 
 def test_no_proposals_when_first_try_passes(tmp_path):

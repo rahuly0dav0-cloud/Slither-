@@ -13,11 +13,14 @@ The manifest's own approval_workflow prescribes this exact contract:
 """
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+
+from .store import _hint_for, error_signature
 
 _PROPOSALS_TOPIC = "agent_proposals"
 _PROPOSALS_FILE = "agent_proposals.json"
@@ -56,26 +59,35 @@ def _is_infra_error(error: str) -> bool:
     return any(marker in low for marker in _INFRA_ERROR_MARKERS)
 
 
-def _first_error_line(error: str) -> str:
-    for line in error.splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped
-    return error.strip()
+def _fix_diff(before: str, after: str, max_lines: int = 40) -> list[str]:
+    """Unified diff of the failed vs. fixed code -- only what the agent changed.
+
+    Keeps the proposal actionable without dumping the whole step: a reviewer sees
+    the exact edit that turned the failure into a pass.
+    """
+    before_lines = (before or "").splitlines()
+    after_lines = (after or "").splitlines()
+    diff = [
+        ln for ln in difflib.unified_diff(before_lines, after_lines, lineterm="", n=2)
+        if not ln.startswith(("---", "+++"))
+    ]
+    if len(diff) > max_lines:
+        diff = diff[:max_lines] + [f"... ({len(diff) - max_lines} more diff lines truncated)"]
+    return diff
 
 
-def _rule_id(proc: str, operation: str, error: str) -> str:
+def _rule_id(proc: str, operation: str, error_sig: str) -> str:
     """Stable id so re-running the same failure doesn't create duplicate cards."""
-    sig = f"{proc}|{operation}|{_first_error_line(error)}"
+    sig = f"{proc}|{operation}|{error_sig}"
     digest = hashlib.sha1(sig.encode("utf-8")).hexdigest()[:8]
     slug = re.sub(r"[^a-z0-9]+", "_", (proc or operation or "step").lower()).strip("_")
     return f"{slug or 'step'}_{digest}"
 
 
-def _title(proc: str, operation: str, error: str, recovered: bool) -> str:
+def _title(proc: str, operation: str, error_sig: str, recovered: bool) -> str:
     what = proc.upper() if proc else (operation or "step")
     verb = "recovered after" if recovered else "failed on"
-    return f"{what}: {verb} — {_first_error_line(error)[:80]}"
+    return f"{what}: {verb} — {error_sig[:80]}"
 
 
 def _keywords(proc: str, operation: str) -> list[str]:
@@ -109,20 +121,24 @@ def draft_proposals(report) -> list[dict]:
         # about converting SAS and only clutter the human review queue.
         if _is_infra_error(first_err):
             continue
+        error_sig = error_signature(first_err)
         recovered = bool(attempts) and attempts[-1].ok
-        fix_code = attempts[-1].code if (recovered and attempts) else ""
+        fixed_code = attempts[-1].code if (recovered and attempts) else ""
+        failed_code = failed[-1].code if failed else ""
+        fix_diff = _fix_diff(failed_code, fixed_code) if (recovered and fixed_code) else []
         step = step_by_index.get(tr.step_index)
         proc = (getattr(step, "proc_name", "") or "").lower()
         operation = getattr(step, "category", "") or ""
         proposals.append({
-            "rule_id": _rule_id(proc, operation, first_err),
+            "rule_id": _rule_id(proc, operation, error_sig),
             "proc": proc,
             "operation": operation,
-            "title": _title(proc, operation, first_err, recovered),
-            "first_error": _first_error_line(first_err),
+            "title": _title(proc, operation, error_sig, recovered),
+            "first_error": error_sig,
+            "hint": _hint_for(error_sig),
             "attempts": len(attempts),
             "recovered": recovered,
-            "fix_code": fix_code,
+            "fix_diff": fix_diff,
             "program": report.program,
             "step_index": tr.step_index,
         })
@@ -144,9 +160,10 @@ def _to_rule(prop: dict) -> dict:
         "rule": [
             f"While converting '{prop['program']}' step {prop['step_index']}, the "
             f"first attempt failed and the agent {outcome}.",
-            f"Observed failure: {prop['first_error']}",
-            "If this generalizes, rewrite it as durable guidance (and a clean "
-            "reference snippet) before approving.",
+            f"Observed exception: {prop['first_error']}",
+            f"Likely cause & fix: {prop['hint']}",
+            "The diff below is the exact edit that made it pass. If it generalizes, "
+            "turn it into durable guidance before approving.",
         ],
         "pitfalls": [prop["first_error"]],
         "provenance": {
@@ -157,8 +174,8 @@ def _to_rule(prop: dict) -> dict:
             "drafted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         },
     }
-    if prop["fix_code"]:
-        rule["snippet"] = {"language": "python", "code": prop["fix_code"].splitlines()}
+    if prop["fix_diff"]:
+        rule["snippet"] = {"language": "diff", "code": prop["fix_diff"]}
     return rule
 
 
