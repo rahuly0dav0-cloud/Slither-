@@ -122,7 +122,25 @@ def current_user() -> dict | None:
 
 # Usernames with full knowledge-base authority. Everyone else's approvals are
 # queued for an admin to confirm before they take effect.
-ADMIN_USERNAMES = {"rahul"}
+_DEFAULT_ADMINS = {"rahul"}
+
+
+def _load_admin_usernames() -> set[str]:
+    """Admin list from secrets/env (comma-separated), falling back to the default."""
+    import os
+
+    raw = os.getenv("ADMIN_USERNAMES")
+    if raw is None:
+        try:
+            raw = st.secrets.get("ADMIN_USERNAMES")  # type: ignore[assignment]
+        except Exception:
+            raw = None
+    if not raw:
+        return set(_DEFAULT_ADMINS)
+    return {name.strip().lower() for name in str(raw).split(",") if name.strip()}
+
+
+ADMIN_USERNAMES = _load_admin_usernames()
 
 
 def is_admin(user: dict | None) -> bool:
