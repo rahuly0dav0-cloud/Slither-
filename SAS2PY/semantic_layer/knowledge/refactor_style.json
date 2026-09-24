@@ -1,0 +1,78 @@
+{
+  "topic": "refactor_style",
+  "version": "1.0.0",
+  "status": "approved",
+  "description": "House style for the post-conversion refactor pass: how to reshape an already-correct, auto-generated pandas pipeline for readability WITHOUT changing behavior. Consolidate imports, extract helpers, group exports at the end, and tidy comments.",
+  "keywords": ["refactor", "optimize", "cleanup", "imports", "helpers", "exports", "comments", "readability", "style"],
+  "rules": {
+    "imports_at_top": {
+      "title": "Consolidate every import at the top of the file, de-duplicated and grouped.",
+      "status": "approved",
+      "source": "authored",
+      "keywords": ["imports", "top", "dedupe", "grouping"],
+      "rule": [
+        "Move all `import`/`from ... import` statements to the top of the file.",
+        "Remove duplicate imports (auto-generated code often repeats `import pandas as pd`).",
+        "Order the block: standard library, then third-party (pandas, numpy, sklearn), then local (`import metadata as md`).",
+        "Keep `import metadata as md` -- the pipeline reads and writes datasets through it."
+      ],
+      "pitfalls": [
+        "Do not drop an import that is still used further down; run a mental check that every name is still imported."
+      ]
+    },
+    "extract_helpers": {
+      "title": "Replace repeated logic with small, well-named helper functions.",
+      "status": "approved",
+      "source": "authored",
+      "keywords": ["dry", "helper", "function", "repetition"],
+      "rule": [
+        "When the same transform repeats across steps, factor it into one helper and call it each time.",
+        "Give helpers a clear verb-based name (`add_running_total`, `winsorize`, `join_lookup`) and a one-line docstring.",
+        "Keep helpers pure where possible: take a DataFrame (and params) in, return a DataFrame out.",
+        "Do not over-abstract: a transform used only once should stay inline."
+      ],
+      "pitfalls": [
+        "Extracting a helper that mutates its argument in place can change behavior for a later step that reuses the original frame -- copy inside the helper or return a new frame."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "def add_scaled(df: pd.DataFrame, col: str, factor: float) -> pd.DataFrame:",
+          "    \"\"\"Return a copy of df with `col` multiplied by `factor`.\"\"\"",
+          "    out = df.copy()",
+          "    out[col] = out[col] * factor",
+          "    return out"
+        ]
+      }
+    },
+    "exports_at_end": {
+      "title": "Group the export calls near the end, in finalization order.",
+      "status": "approved",
+      "source": "authored",
+      "keywords": ["export", "md.export_data", "end", "ordering"],
+      "rule": [
+        "Collect the `md.export_data(df, name)` calls together near the end of the script, ordered by when each dataset is finalized.",
+        "The SET of exported dataset names must stay EXACTLY the same -- never rename, add, or drop an export.",
+        "EXCEPTION: if a later section re-imports a dataset via `md.import_data(name)`, that dataset must be exported BEFORE the read; correctness beats grouping."
+      ],
+      "pitfalls": [
+        "Deferring an export past a later `md.import_data` of the same name makes the read fail or read stale data -- keep such an export before its consumer."
+      ]
+    },
+    "tidy_comments": {
+      "title": "Keep one short comment per logical section; remove noise.",
+      "status": "approved",
+      "source": "authored",
+      "keywords": ["comments", "docstring", "sections"],
+      "rule": [
+        "Add a brief section comment describing WHAT each block does (e.g. `# --- build customer features ---`).",
+        "Delete redundant comments that merely restate the code (`# add 1 to x`).",
+        "Prefer clear variable and helper names over explanatory comments.",
+        "A short module docstring summarizing the pipeline is welcome but optional."
+      ],
+      "pitfalls": [
+        "Do not remove a comment that records a non-obvious business rule or a SAS quirk being reproduced."
+      ]
+    }
+  }
+}

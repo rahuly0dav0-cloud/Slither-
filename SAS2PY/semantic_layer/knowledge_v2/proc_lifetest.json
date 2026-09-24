@@ -1,0 +1,56 @@
+{
+  "topic": "proc_lifetest",
+  "version": "0.1.0",
+  "status": "approved",
+  "description": "Reproducing PROC LIFETEST life-table (actuarial) survival estimates: METHOD=LT over fixed intervals, Greenwood variance, complementary log-log confidence limits, PDF and hazard with their limits, per strata.",
+  "keywords": ["proc lifetest", "life table", "actuarial", "survival", "method=lt", "greenwood", "hazard", "outsurv", "strata", "censoring", "kaplan meier"],
+  "rules": {
+    "actuarial_life_table": {
+      "title": "METHOD=LT builds an actuarial life table with effective sample size n' = n_enter - (censored/2).",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["life table", "actuarial", "method=lt", "effective sample", "survival"],
+      "applies_to": {
+        "proc": ["lifetest"],
+        "operations": ["survival analysis", "life table"]
+      },
+      "rule": [
+        "The actuarial (life-table) estimator groups event/censor times into fixed-width intervals (set by NINTERVAL= or a width) and computes, per interval i:",
+        "  - n_enter[i]: number at risk entering the interval (previous entrants minus prior events and prior censored).",
+        "  - d[i]: events in the interval; w[i]: censored in the interval.",
+        "  - effective at risk n'[i] = n_enter[i] - w[i]/2  (censored assumed at risk for half the interval).",
+        "  - conditional event prob q[i] = d[i]/n'[i]; survival prob within interval p[i] = 1 - q[i].",
+        "  - Survival S at interval boundaries is the cumulative product of p over prior intervals (S[0] = 1).",
+        "Process each STRATA group independently; a FREQ variable weights each record's contribution to n_enter, d, and w.",
+        "SAS trims trailing intervals after the last one containing any event or censoring."
+      ],
+      "pitfalls": [
+        "Kaplan-Meier (METHOD=KM/PL) is a DIFFERENT estimator (jumps at event times, no half-censored adjustment). Do not mix it with METHOD=LT.",
+        "Omitting the w/2 half-interval adjustment in n' biases every downstream quantity.",
+        "Survival is defined at interval BOUNDARIES (one more than the number of intervals); off-by-one errors shift the whole curve."
+      ]
+    },
+    "greenwood_and_cloglog_ci": {
+      "title": "Variance is Greenwood's formula; default confidence limits use the complementary log-log transform.",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["greenwood", "variance", "confidence limit", "log-log", "cloglog", "sdf_lcl", "sdf_ucl"],
+      "applies_to": {
+        "proc": ["lifetest"],
+        "operations": ["survival analysis", "confidence interval"]
+      },
+      "rule": [
+        "Greenwood variance of S at a boundary: Var(S) = S^2 * sum_over_prior_intervals( q[j] / (n'[j] * p[j]) ).",
+        "SAS default survival confidence limits use the complementary log-log (log of the cumulative hazard) transform, which keeps limits inside [0,1]:",
+        "  - Let H = -ln(S), then CI on ln(H) is ln(H) +/- z * se_g, where se_g = se(S) / (S * H) and z = normal quantile for the chosen alpha.",
+        "  - Back-transform: limits on S are exp( -exp( ln(H) +/- z*se_g ) ) (note the sign swap maps to lower/upper).",
+        "  - Clamp to [0,1]; when S is 0 or 1 the limits collapse to that boundary.",
+        "PDF and HAZARD each have their own variance-based limits over the interval; report them only where the estimate is defined (q>0, n'>0)."
+      ],
+      "pitfalls": [
+        "Using a naive symmetric (linear) CI S +/- z*se(S) can exit [0,1] and will not match SAS defaults (which are cloglog).",
+        "Dividing by zero when p or n' is zero: guard those intervals and carry the previous cumulative variance forward."
+      ]
+    }
+  }
+}

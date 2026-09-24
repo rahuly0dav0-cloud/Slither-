@@ -1,0 +1,211 @@
+{
+  "topic": "agent_proposals",
+  "version": "0.1.0",
+  "status": "rejected",
+  "description": "Agent-drafted rule candidates from conversion debug traces. Review, edit, and approve before they inform conversions.",
+  "keywords": [
+    "agent-learned",
+    "proposed",
+    "debug",
+    "pitfall"
+  ],
+  "rules": {
+    "data_engineering_28309469": {
+      "title": "data_engineering: failed on — LLM request failed (e.g. rate limit): 401 Client Error: Unauthorized for url: ht",
+      "status": "rejected",
+      "source": "agent-learned",
+      "keywords": [
+        "data_engineering",
+        "agent-learned"
+      ],
+      "applies_to": {
+        "proc": [],
+        "operations": [
+          "data_engineering"
+        ]
+      },
+      "rule": [
+        "While converting '01_data_engineering_merge_means' step 0, the first attempt failed and the agent could not recover within the debug budget.",
+        "Observed failure: LLM request failed (e.g. rate limit): 401 Client Error: Unauthorized for url: https://api.groq.com/openai/v1/chat/completions",
+        "If this generalizes, rewrite it as durable guidance (and a clean reference snippet) before approving."
+      ],
+      "pitfalls": [
+        "LLM request failed (e.g. rate limit): 401 Client Error: Unauthorized for url: https://api.groq.com/openai/v1/chat/completions"
+      ],
+      "provenance": {
+        "program": "01_data_engineering_merge_means",
+        "step_index": 0,
+        "attempts": 3,
+        "recovered": false,
+        "drafted_at": "2026-09-21T14:30:29+00:00"
+      }
+    },
+    "data_engineering_d5bfa1f9": {
+      "title": "data_engineering: recovered after — QC did not match the SAS output. Correct the Python so it matches.",
+      "status": "rejected",
+      "source": "agent-learned",
+      "keywords": [
+        "data_engineering",
+        "agent-learned"
+      ],
+      "applies_to": {
+        "proc": [],
+        "operations": [
+          "data_engineering"
+        ]
+      },
+      "rule": [
+        "While converting '01_data_engineering_merge_means' step 1, the first attempt failed and the agent recovered within the debug budget.",
+        "Observed failure: QC did not match the SAS output. Correct the Python so it matches.",
+        "If this generalizes, rewrite it as durable guidance (and a clean reference snippet) before approving."
+      ],
+      "pitfalls": [
+        "QC did not match the SAS output. Correct the Python so it matches."
+      ],
+      "provenance": {
+        "program": "01_data_engineering_merge_means",
+        "step_index": 1,
+        "attempts": 2,
+        "recovered": true,
+        "drafted_at": "2026-09-23T08:47:06+00:00"
+      },
+      "snippet": {
+        "language": "python",
+        "code": [
+          "import pandas as pd",
+          "import numpy as np",
+          "import metadata as md",
+          "",
+          "# Read source data",
+          "df = md.import_data(\"demo.raw_transactions\").copy()",
+          "",
+          "# ------------------------------------------------------------------",
+          "# Compute transaction_amount = sum(amount, fee) skipping missing values",
+          "amount_series = df[\"amount\"] if \"amount\" in df.columns else pd.Series([np.nan] * len(df))",
+          "fee_series = df[\"fee\"] if \"fee\" in df.columns else pd.Series([np.nan] * len(df))",
+          "df[\"transaction_amount\"] = pd.concat([amount_series, fee_series], axis=1).sum(axis=1, skipna=True)",
+          "",
+          "# If transaction_amount is missing after sum, set to 0",
+          "df.loc[df[\"transaction_amount\"].isna(), \"transaction_amount\"] = 0",
+          "",
+          "# ------------------------------------------------------------------",
+          "# Parse transaction_date (SAS integer days since 1960 or string)",
+          "if pd.api.types.is_numeric_dtype(df[\"transaction_date\"]):",
+          "    tran_dt = pd.to_datetime(df[\"transaction_date\"], unit=\"D\", origin=\"1960-01-01\", errors=\"coerce\")",
+          "else:",
+          "    tran_dt = pd.to_datetime(df[\"transaction_date\"], errors=\"coerce\")",
+          "",
+          "# Delete rows where transaction_date < 01JAN2025",
+          "cutoff = pd.Timestamp(\"2025-01-01\")",
+          "df = df.loc[~(tran_dt < cutoff)].copy()",
+          "",
+          "# ------------------------------------------------------------------",
+          "# Derive month and year",
+          "df[\"month\"] = tran_dt.dt.month",
+          "df[\"year\"] = tran_dt.dt.year",
+          "",
+          "# Format transaction_date as SAS DATE9 string (e.g., 10FEB2025)",
+          "df[\"transaction_date\"] = tran_dt.dt.strftime(\"%d%b%Y\").str.upper()",
+          "",
+          "# ------------------------------------------------------------------",
+          "# Keep required columns in exact order",
+          "out_cols = [",
+          "    \"customer_id\",",
+          "    \"transaction_date\",",
+          "    \"transaction_amount\",",
+          "    \"month\",",
+          "    \"year\"",
+          "]",
+          "transaction_clean = df[out_cols].copy()",
+          "",
+          "# Export result",
+          "md.export_data(transaction_clean, \"demo.transaction_clean\")"
+        ]
+      }
+    },
+    "means_f241508a": {
+      "title": "MEANS: recovered after — QC could not compare the output: 'customer_id' is both an index level and a colu",
+      "status": "rejected",
+      "source": "agent-learned",
+      "keywords": [
+        "means",
+        "data_engineering",
+        "agent-learned"
+      ],
+      "applies_to": {
+        "proc": [
+          "means"
+        ],
+        "operations": [
+          "data_engineering"
+        ]
+      },
+      "rule": [
+        "While converting '01_data_engineering_merge_means' step 5, the first attempt failed and the agent recovered within the debug budget.",
+        "Observed failure: QC could not compare the output: 'customer_id' is both an index level and a column label, which is ambiguous.",
+        "If this generalizes, rewrite it as durable guidance (and a clean reference snippet) before approving."
+      ],
+      "pitfalls": [
+        "QC could not compare the output: 'customer_id' is both an index level and a column label, which is ambiguous."
+      ],
+      "provenance": {
+        "program": "01_data_engineering_merge_means",
+        "step_index": 5,
+        "attempts": 3,
+        "recovered": true,
+        "drafted_at": "2026-09-23T08:47:06+00:00"
+      },
+      "snippet": {
+        "language": "python",
+        "code": [
+          "import pandas as pd",
+          "import metadata as md",
+          "",
+          "# Read input data",
+          "df = md.import_data(\"demo.customer_transactions\")",
+          "",
+          "# Strip trailing blanks from character keys (SAS ignores them)",
+          "for col in [\"customer_id\", \"customer_segment\"]:",
+          "    if df[col].dtype == object:",
+          "        df[col] = df[col].str.strip()",
+          "",
+          "# Group by CLASS variables, keeping missing-key groups",
+          "group = df.groupby([\"customer_id\", \"customer_segment\"], dropna=False)",
+          "",
+          "# Aggregate statistics",
+          "agg = group[\"transaction_amount\"].agg(",
+          "    transaction_count=\"count\",",
+          "    total_transaction_amount=\"sum\",",
+          "    avg_transaction_amount=\"mean\",",
+          "    min_transaction_amount=\"min\",",
+          "    max_transaction_amount=\"max\",",
+          ").reset_index()",
+          "",
+          "# _FREQ_ = number of rows per group (including rows where transaction_amount is missing)",
+          "agg[\"_FREQ_\"] = group.size().values",
+          "",
+          "# _TYPE_ = binary code for CLASS variables (customer_id=1, customer_segment=2 => 3)",
+          "agg[\"_TYPE_\"] = 3",
+          "",
+          "# Reorder columns to match SAS output order",
+          "summary = agg[",
+          "    [",
+          "        \"_TYPE_\",",
+          "        \"_FREQ_\",",
+          "        \"customer_id\",",
+          "        \"customer_segment\",",
+          "        \"transaction_count\",",
+          "        \"total_transaction_amount\",",
+          "        \"avg_transaction_amount\",",
+          "        \"min_transaction_amount\",",
+          "        \"max_transaction_amount\",",
+          "    ]",
+          "]",
+          "",
+          "# Export the result",
+          "md.export_data(summary, \"demo.customer_summary\")"
+        ]
+      }
+    }
+  }
+}

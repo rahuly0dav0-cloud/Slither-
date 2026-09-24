@@ -1,0 +1,38 @@
+{
+  "topic": "glmselect_stepwise",
+  "version": "1.0.0",
+  "status": "approved",
+  "description": "PROC GLMSELECT SELECTION=STEPWISE -> statsmodels-based forward/backward selection mirroring SAS SLENTRY/SLSTAY or CHOOSE=SBC/AIC.",
+  "keywords": ["glmselect", "stepwise", "variable selection", "slentry", "slstay", "sbc", "aic", "forward", "backward", "outest"],
+  "rules": {
+    "glmselect_stepwise": {
+      "title": "SELECTION=STEPWISE -> implement forward/backward selection with statsmodels; the selected variable set is the primary QC target.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["glmselect", "stepwise", "slentry", "slstay", "sbc", "aic", "statsmodels"],
+      "applies_to": {
+        "proc": ["glmselect"],
+        "operations": ["stepwise regression", "variable selection"]
+      },
+      "rule": [
+        "Stepwise selection adds/removes predictors by a criterion (SL, SBC, AIC); SAS controls entry/stay with `SLENTRY=`/`SLSTAY=` or `SELECT=`/`CHOOSE=`.",
+        "scikit-learn has no exact stepwise -- use `statsmodels` and implement forward/backward selection by p-value or information criterion to mirror SAS.",
+        "Reproduce the SAS criterion exactly: significance-level stepwise adds if p < SLENTRY and drops if p > SLSTAY; `CHOOSE=SBC`/`AIC` picks the step minimizing that criterion.",
+        "GLMSELECT standardizes predictors by default.",
+        "`OUTEST=` holds the final coefficients; the **selected variable set** is the primary QC target, then the estimates within tolerance."
+      ],
+      "pitfalls": [
+        "Chasing exact betas instead of the selected-variable set; parity on the chosen predictors matters more.",
+        "Mismatching the entry/stay criterion (p-value vs SBC/AIC) yields a different final model."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "# forward/backward with statsmodels OLS:",
+          "# add if p < SLENTRY, drop if p > SLSTAY; or pick the step minimizing SBC/AIC.",
+          "# res = sm.OLS(y, sm.add_constant(X[selected])).fit()  # evaluate each candidate"
+        ]
+      }
+    }
+  }
+}

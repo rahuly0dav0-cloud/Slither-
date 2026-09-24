@@ -1,0 +1,37 @@
+{
+  "topic": "missing_values",
+  "version": "1.0.0",
+  "status": "approved",
+  "description": "How SAS missing values behave (numeric . sorts smallest, char missing is empty string) and how to match that in pandas.",
+  "keywords": ["missing", "null", "nan", "sort", "na_position", "isna", "skipna"],
+  "rules": {
+    "missing_value_semantics": {
+      "title": "SAS numeric missing sorts smallest and maps to NaN; SAS char missing is an empty string, not NaN.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["missing", "nan", "sort", "isna", "skipna"],
+      "applies_to": {
+        "proc": [],
+        "operations": ["conditional assignment", "filter rows"]
+      },
+      "rule": [
+        "SAS numeric missing is `.` and sorts as the **smallest** value; it maps to `NaN` in pandas.",
+        "SAS character missing is an empty string `\"\"`, **not** NaN. Keep empty strings as `\"\"` unless the QC baseline shows NaN.",
+        "In numeric comparisons SAS treats missing as less than every number. `df.sort_values` puts NaN last by default -- pass `na_position=\"first\"` to match SAS ordering.",
+        "Aggregations (MEAN, SUM) in SAS **ignore** missing by default, like pandas `.mean()`/`.sum()` with `skipna=True` (the default).",
+        "`IF x = . THEN ...` becomes `df[\"x\"].isna()`."
+      ],
+      "pitfalls": [
+        "Sorting with pandas defaults places NaN last, which disagrees with SAS (missing first); pass na_position='first'.",
+        "Coercing empty-string char missings to NaN can break exact-match QC against the SAS baseline."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "df = df.sort_values(\"x\", na_position=\"first\")   # SAS: missing sorts smallest",
+          "mask = df[\"x\"].isna()                              # IF x = ."
+        ]
+      }
+    }
+  }
+}

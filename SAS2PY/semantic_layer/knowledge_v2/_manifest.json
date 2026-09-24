@@ -1,0 +1,60 @@
+{
+  "_comment": "APPROVED semantic layer v2 (peer-reviewed 2026-09-16). Served only when KNOWLEDGE_V2_DIR is set; the default live pipeline still reads knowledge/. The env gate stays so rollout is controlled, but the rules are signed off.",
+  "schema_version": "0.1.0",
+  "status": "approved",
+  "rationale": {
+    "why_json": "Structured storage enables (a) agent-proposed additions gated by human approval, (b) richer keyword retrieval today, and (c) clean per-rule chunks for a future embeddings/vector-DB pivot. Prose is rendered from JSON at prompt-build time so the LLM still reads natural language.",
+    "generality": "Every rule is written to describe generic SAS behavior, independent of any specific proprietary algorithm (e.g. GLSPLN/RBNN). Snippets are clean-room, textbook implementations, not copied from reference code."
+  },
+  "topic_file_schema": {
+    "topic": "string  - short id, matches filename stem",
+    "version": "semver string",
+    "status": "proposed | approved",
+    "description": "one-line summary of the topic",
+    "keywords": ["array of retrieval keywords for the whole topic"],
+    "rules": {
+      "<rule_id>": {
+        "title": "short human-readable statement of the rule",
+        "status": "proposed | approved",
+        "source": "curated-generic | agent-learned",
+        "keywords": ["retrieval keywords specific to this rule"],
+        "applies_to": {
+          "proc": ["sas proc names this rule applies to, lowercase"],
+          "operations": ["operation tags used by the retriever"]
+        },
+        "rule": ["prose guidance as an array of lines/bullets"],
+        "pitfalls": ["optional array of common mistakes to avoid"],
+        "snippet": {
+          "language": "python",
+          "code": ["optional canonical reference code as an array of lines"]
+        },
+        "reference_impl": {
+          "module": "optional path to a full tested implementation under SAS2PY/semantic_layer/reference/",
+          "symbol": "the class/function in that module that realizes this rule",
+          "note": "one-line description of what the reference implementation provides beyond the inline snippet"
+        }
+      }
+    }
+  },
+  "reference_implementations": {
+    "_comment": "Full, tested clean-room ports live under SAS2PY/semantic_layer/reference/generic/. The inline `snippet` in each rule is a minimal teaching version; `reference_impl` on a rule points at the production-grade module here.",
+    "SAS2PY/semantic_layer/reference/generic/sas_utils.py": "SASRandom (legacy RANUNI stream), sas_percent (PERCENTw.d), proc_univariate (Moments/Measures/Location tests/Quantiles/Extremes, PCTLDEF=5), export_xlsx (PROC EXPORT DBMS=XLSX).",
+    "SAS2PY/semantic_layer/reference/generic/glmselect.py": "GLMSelectStepwise: SBC-based effect-level stepwise (PROC GLMSELECT SELECTION=STEPWISE), PARAM=GLM class coding with aliasing, INCLUDE= forcing, sas_rank singularity detection, and ODS-style SelectionSummary/ParameterEstimates/ANOVA/FitStatistics.",
+    "SAS2PY/semantic_layer/reference/generic/matrix_rank.py": "Standalone SAS-style relative-pivot rank/singularity detection."
+  },
+  "conventions": {
+    "code_as_lines": "Snippet code is stored as an array of strings (one per line) so JSON stays diffable and free of escaped newlines; the renderer joins them with '\\n'.",
+    "approval_workflow": "Agent-added rules should be inserted with status='proposed' and source='agent-learned'. A human review flips status to 'approved' before the retriever is allowed to serve them.",
+    "retrieval_bridge": "When this layer is adopted, a loader will map applies_to.proc / applies_to.operations to rules (replacing the filename map in src/knowledge/retriever.py) and render the matched rules to text."
+  },
+  "topics": [
+    "sas_percentiles",
+    "sas_singularity_rank",
+    "proc_reg_outest",
+    "class_glm_encoding",
+    "model_selection_sbc",
+    "proc_lifetest",
+    "proc_univariate",
+    "sas_ranuni"
+  ]
+}

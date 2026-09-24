@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Generated QC artifacts / data
+data/python_out/
+data/work/
+
+# Per-job conversion outputs (self-contained job folders)
+Workspaces/
+
+# Archived legacy runs / orphaned files (safe to delete)
+archive/
+
+# Local user accounts + learning memory (never commit credentials)
+data/users/
+data/learning/
+
+# Streamlit secrets (API keys, DB URL) — never commit
+.streamlit/secrets.toml
+
+# OS / editor
+.DS_Store

@@ -1,0 +1,60 @@
+{
+  "topic": "proc_univariate",
+  "version": "0.1.0",
+  "status": "approved",
+  "description": "How to reproduce PROC UNIVARIATE default output (Moments, Basic Measures, Tests for Location, Quantiles, Extreme Observations) with SAS-faithful formulas.",
+  "keywords": ["proc univariate", "moments", "skewness", "kurtosis", "quantiles", "tests for location", "student t", "sign test", "signed rank", "extreme observations", "descriptive statistics"],
+  "rules": {
+    "univariate_moments": {
+      "title": "PROC UNIVARIATE Moments use bias-corrected skewness/kurtosis and the sample (n-1) variance.",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["moments", "skewness", "kurtosis", "variance", "std error", "coeff variation", "uncorrected ss", "corrected ss"],
+      "applies_to": {
+        "proc": ["univariate"],
+        "operations": ["summary statistics", "descriptive statistics"]
+      },
+      "rule": [
+        "Variance and Std Deviation use the sample estimator (ddof=1); Std Error Mean = Std / sqrt(n).",
+        "Skewness = (n / ((n-1)(n-2))) * sum(z^3), where z = (x - mean)/std; requires n >= 3.",
+        "Kurtosis = (n(n+1) / ((n-1)(n-2)(n-3))) * sum(z^4) - 3(n-1)^2 / ((n-2)(n-3)); requires n >= 4. This is the EXCESS kurtosis SAS reports.",
+        "Uncorrected SS = sum(x^2); Corrected SS = sum((x-mean)^2); Coeff Variation = 100 * std / mean.",
+        "numpy/pandas/scipy defaults differ (population variance, or Fisher-g skewness); implement the SAS formulas explicitly for parity."
+      ],
+      "pitfalls": [
+        "scipy.stats.skew/kurtosis default to the biased (population) 'g' statistics, not SAS's bias-corrected 'G' statistics.",
+        "Using ddof=0 anywhere in the moment chain silently shifts std, CV, std-error, skewness and kurtosis."
+      ],
+      "reference_impl": {
+        "module": "SAS2PY/semantic_layer/reference/generic/sas_utils.py",
+        "symbol": "proc_univariate / _sas_skewness / _sas_kurtosis",
+        "note": "Full Moments, Basic Measures, Tests for Location, Quantiles (PCTLDEF=5) and Extreme Observations tables as DataFrames."
+      }
+    },
+    "univariate_location_tests": {
+      "title": "Tests for Location report Student's t, Sign, and Signed Rank against Mu0 (default 0).",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["tests for location", "student t", "sign test", "signed rank", "mu0", "wilcoxon"],
+      "applies_to": {
+        "proc": ["univariate"],
+        "operations": ["hypothesis test", "summary statistics"]
+      },
+      "rule": [
+        "Student's t: t = (mean - Mu0) / (std/sqrt(n)); two-sided p from the t distribution with n-1 df.",
+        "Sign test statistic M = (n_pos - n_neg)/2 over the non-zero deviations d = x - Mu0; two-sided p from the binomial(n_nonzero, 0.5) tail.",
+        "Signed Rank S is centered as W+ - n_nonzero(n_nonzero+1)/4 on the ranks of |d| (zeros dropped); SAS uses a t/normal approximation for the p-value.",
+        "Drop deviations exactly equal to zero before the Sign and Signed Rank tests (SAS excludes ties at Mu0)."
+      ],
+      "pitfalls": [
+        "Forgetting to drop d==0 rows inflates n for the sign/signed-rank tests.",
+        "Reporting a one-sided p-value; SAS defaults to two-sided."
+      ],
+      "reference_impl": {
+        "module": "SAS2PY/semantic_layer/reference/generic/sas_utils.py",
+        "symbol": "proc_univariate",
+        "note": "location_tests DataFrame (Student's t / Sign / Signed Rank) with two-sided p-values."
+      }
+    }
+  }
+}

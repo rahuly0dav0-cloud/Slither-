@@ -1,0 +1,9 @@
+[project]
+name = "sas-to-python-agent"
+version = "0.1.0"
+description = "Slither — agentic SAS to Python migration framework with deterministic QC"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["SAS2PY"]
+testpaths = ["tests"]

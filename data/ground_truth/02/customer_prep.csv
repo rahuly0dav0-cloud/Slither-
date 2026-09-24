@@ -1,0 +1,5 @@
+state,customer_id,age,age_band,income,income_band
+NY,1,45,30_49,200000,HIGH
+CA,2,50,50_PLUS,80000,MEDI
+TX,3,15,UNDER18,40000,LOW
+WA,4,30,30_49,0,LOW

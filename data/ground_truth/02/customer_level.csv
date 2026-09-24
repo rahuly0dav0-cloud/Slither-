@@ -1,0 +1,6 @@
+customer_id,age_band,income_band,account_count,total_balance,total_credit_limit,avg_utilization,available_credit,over_limit_flag,utilization_flag
+1,30_49,HIGH,2,12500,15000,0.775,2500,0,0
+2,50_PLUS,MEDI,1,50000,100000,0.5,50000,0,0
+3,UNDER18,LOW,1,0,8000,0,8000,0,0
+4,30_49,LOW,1,5000,0,0,-5000,1,0
+99,UNKNOWN,UNKN,1,2000,4000,0.5,2000,0,0

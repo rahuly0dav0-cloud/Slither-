@@ -1,0 +1,6 @@
+customer_id,age_band,income_band,_TYPE_,_FREQ_,account_count,total_balance,total_credit_limit,avg_utilization
+1,30_49,HIGH,7,2,2,12500,15000,0.775
+2,50_PLUS,MEDI,7,1,1,50000,100000,0.5
+3,UNDER18,LOW,7,1,1,0,8000,0
+4,30_49,LOW,7,1,1,5000,0,0
+99,UNKNOWN,UNKN,7,1,1,2000,4000,0.5

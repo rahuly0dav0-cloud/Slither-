@@ -1,0 +1,50 @@
+{
+  "topic": "refactor_pitfalls",
+  "version": "1.0.0",
+  "status": "approved",
+  "description": "Behavior-changing traps to avoid during the refactor pass. Every rule here protects a numeric or structural result that the automated re-QC would otherwise reject.",
+  "keywords": ["refactor", "pitfalls", "behavior", "qc", "correctness", "dtype", "index", "order"],
+  "rules": {
+    "preserve_results": {
+      "title": "Never change a numeric or logical result while reshaping.",
+      "status": "approved",
+      "source": "authored",
+      "keywords": ["numeric", "identical", "qc", "reject"],
+      "rule": [
+        "The refactor is re-validated by QC against the reference datasets; any deviation is rejected and the original code is kept.",
+        "Reorganize freely (order of unrelated blocks, helper extraction, naming) but keep every computed value identical.",
+        "Do not 'simplify' a formula, rounding, or fillna default -- reproduce it exactly."
+      ],
+      "pitfalls": [
+        "Swapping the order of two steps that share a dataset can change the result -- only reorder truly independent blocks."
+      ]
+    },
+    "preserve_index_and_dtype": {
+      "title": "Keep index handling and dtypes intact.",
+      "status": "approved",
+      "source": "authored",
+      "keywords": ["index", "reset_index", "dtype", "sort"],
+      "rule": [
+        "Preserve `.reset_index(drop=True)` calls -- dropping them changes row labels and can change QC key alignment.",
+        "Do not introduce or remove `.copy()` in a way that turns a value assignment into a SettingWithCopy no-op.",
+        "Keep any explicit `.astype(...)` -- refactoring must not silently change a column's dtype."
+      ],
+      "pitfalls": [
+        "Chaining operations that were previously separated by a `.copy()` can trigger a SettingWithCopyWarning and skip the write."
+      ]
+    },
+    "helper_side_effects": {
+      "title": "Beware in-place mutation when extracting helpers.",
+      "status": "approved",
+      "source": "authored",
+      "keywords": ["mutation", "in-place", "copy", "helper"],
+      "rule": [
+        "A helper that mutates its DataFrame argument affects every later use of that frame; copy inside the helper or return a new frame.",
+        "Prefer returning the transformed frame and reassigning at the call site."
+      ],
+      "pitfalls": [
+        "`df.drop(cols, inplace=True)` inside a helper mutates the caller's frame -- use `return df.drop(cols)` instead."
+      ]
+    }
+  }
+}

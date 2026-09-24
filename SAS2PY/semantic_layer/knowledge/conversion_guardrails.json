@@ -1,0 +1,182 @@
+{
+  "topic": "conversion_guardrails",
+  "version": "1.0.0",
+  "status": "approved",
+  "description": "Universal SAS->pandas gotchas applied to every conversion: case sensitivity, SUM vs +, dates, dtypes, float tolerance, blanks, char truncation, missing semantics, column order, and merge overwrites.",
+  "keywords": ["guardrails", "universal", "case", "sum", "dates", "dtypes", "tolerance", "rounding", "blanks", "truncation", "missing", "column order", "merge"],
+  "rules": {
+    "g01_case_insensitive_columns": {
+      "title": "Column names are case-insensitive in SAS but case-sensitive in pandas -- preserve exact output names.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["case", "column names"],
+      "applies_to": {"proc": [], "operations": []},
+      "rule": [
+        "SAS treats `Queue` and `queue` as the same variable; pandas does not.",
+        "Preserve the exact output column names the SAS step produces -- do not silently re-case."
+      ],
+      "pitfalls": [],
+      "snippet": {"language": "python", "code": []}
+    },
+    "g02_sum_ignores_missing": {
+      "title": "SAS SUM() ignores missing; Python + propagates NaN.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["sum", "missing", "nan"],
+      "applies_to": {"proc": [], "operations": []},
+      "rule": [
+        "SAS `sum(a, b, c)` skips missing values; Python `a + b + c` yields `NaN` if any operand is `NaN`.",
+        "Use a row-wise sum that skips NaN to match SAS SUM()."
+      ],
+      "pitfalls": [],
+      "snippet": {"language": "python", "code": [
+        "df[\"total\"] = df[[\"a\", \"b\", \"c\"]].sum(axis=1)   # matches SAS SUM(), skips NaN"
+      ]}
+    },
+    "g03_sas_dates": {
+      "title": "SAS dates: know whether you have an integer day-count (origin 1960) or a formatted string.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["dates", "origin", "1960", "intck", "to_datetime"],
+      "applies_to": {"proc": [], "operations": []},
+      "rule": [
+        "A raw SAS integer is a day count with origin **1960-01-01** (not the 1970 Unix epoch); the wrong epoch shifts every date by 10 years.",
+        "A formatted string like `15JAN1980` (`date9.`) is text, NOT a day count -- do not use `origin=` on it (it raises); parse the format instead.",
+        "Check the dtype: an object/string column is the formatted-string case, a numeric column is the integer case.",
+        "`intck('year', start, end)` counts year **boundaries crossed** = `end.year - start.year` (not age at last birthday); `intck('month', ...)` = `(end.year-start.year)*12 + (end.month-start.month)`."
+      ],
+      "pitfalls": [
+        "Using the default unix epoch (1970) on a raw SAS integer shifts dates 10 years.",
+        "Passing origin= together with a string date raises 'str is not compatible with origin'."
+      ],
+      "snippet": {"language": "python", "code": [
+        "# (a) raw SAS integer day-count -- origin 1960-01-01, NOT unix 1970:",
+        "d = pd.to_datetime(sas_int, unit=\"D\", origin=\"1960-01-01\")",
+        "# (b) formatted date string like '15JAN1980' (date9.) -- parse, do not use origin=:",
+        "d = pd.to_datetime(s, format=\"%d%b%Y\")",
+        "# intck('year', a, b) = boundaries crossed = b.year - a.year:",
+        "age = end.dt.year - start.dt.year"
+      ]}
+    },
+    "g04_validate_dtypes": {
+      "title": "Validate data types; cast id/date columns explicitly.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["dtypes", "astype", "Int64", "id", "join"],
+      "applies_to": {"proc": [], "operations": []},
+      "rule": [
+        "A SAS numeric with missing values becomes a float in pandas, which breaks joins on id-like columns (`100010.0` vs `100010`).",
+        "Cast deliberately: nullable integer for ids, datetime for dates."
+      ],
+      "pitfalls": [
+        "Joining on a float-demoted id column silently drops matches."
+      ],
+      "snippet": {"language": "python", "code": [
+        "df[\"dnd_nb\"] = df[\"dnd_nb\"].astype(\"Int64\")   # nullable integer id",
+        "df[\"tran_dt\"] = pd.to_datetime(df[\"tran_dt\"])"
+      ]}
+    },
+    "g05_float_tolerance": {
+      "title": "Compare numbers within tolerance; rounding conventions differ (banker's vs half-up).",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["tolerance", "isclose", "rounding", "banker's", "half-up"],
+      "applies_to": {"proc": [], "operations": []},
+      "rule": [
+        "SAS and Python can differ in the last decimals, and Python `round()` uses banker's (half-even) rounding while SAS uses half-up.",
+        "Never compare floats with `==`; use a tolerance, and make rounding explicit when a convention is required."
+      ],
+      "pitfalls": [
+        "Python's half-even round() disagrees with SAS half-up on .5 boundaries."
+      ],
+      "snippet": {"language": "python", "code": [
+        "np.isclose(py_val, sas_val, atol=1e-6)",
+        "df[\"wmape\"] = df[\"wmape\"].round(6)"
+      ]}
+    },
+    "g06_trailing_blanks": {
+      "title": "SAS ignores trailing blanks; pandas does not -- strip character keys.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["blanks", "strip", "fixed width", "keys"],
+      "applies_to": {"proc": [], "operations": []},
+      "rule": [
+        "SAS stores characters in fixed-width fields and ignores trailing spaces when comparing (`\"CABCD\"` == `\"CABCD \"`).",
+        "Strip character keys before join/filter."
+      ],
+      "pitfalls": [
+        "Unstripped trailing spaces make otherwise-equal keys fail to join."
+      ],
+      "snippet": {"language": "python", "code": [
+        "df[\"queue\"] = df[\"queue\"].str.strip()"
+      ]}
+    },
+    "g07_char_truncation": {
+      "title": "SAS silently truncates characters to the declared length, set by the FIRST value assigned.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["truncation", "length", "first literal", "slice", "np.select"],
+      "applies_to": {"proc": [], "operations": []},
+      "rule": [
+        "A `$5` variable stores `CABCDE` as `CABCD`. Only replicate truncation when the SAS field genuinely truncated (to keep keys matching); otherwise keep the full value.",
+        "The length is set by the **FIRST literal assigned in program order**, not the longest. Later, longer literals are truncated to that width.",
+        "Scan the assignments in source order, take `len(first_literal)`, and slice every value of that variable to it. A later explicit `LENGTH var $n;` overrides this."
+      ],
+      "pitfalls": [
+        "income_band whose first literal is 'HIGH' is $4, so 'MEDIUM'->'MEDI' and 'UNKNOWN'->'UNKN' -- a classic silent QC mismatch."
+      ],
+      "snippet": {"language": "python", "code": [
+        "df[\"queue\"] = df[\"queue\"].str.slice(0, 5)   # only to match a genuinely truncated SAS $5 field",
+        "# length fixed by first literal in program order (here 'HIGH' -> $4):",
+        "df[\"income_band\"] = np.select(conds, choices, default=\"\").str.slice(0, 4)"
+      ]}
+    },
+    "g08_missing_semantics": {
+      "title": "Missing-value semantics are richer in SAS; groupby must keep the missing-key group.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["missing", "special missing", "groupby", "dropna"],
+      "applies_to": {"proc": [], "operations": []},
+      "rule": [
+        "SAS has numeric missing (`.`), 28 special missings (`.A`-`.Z`, `._`), and empty strings (`''`); pandas collapses these to `NaN`/`None`.",
+        "SAS keeps missing key values as their own group, while pandas `groupby` drops NaN keys by default -- pass `dropna=False`."
+      ],
+      "pitfalls": [
+        "Default groupby drops NaN-key rows, losing the missing-key group SAS keeps."
+      ],
+      "snippet": {"language": "python", "code": [
+        "df.groupby(\"queue\", dropna=False)[\"vol\"].sum()   # keep the missing-key group"
+      ]}
+    },
+    "g09_column_order": {
+      "title": "Column order is part of output correctness.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["column order", "structural qc"],
+      "applies_to": {"proc": [], "operations": []},
+      "rule": [
+        "Even with all the right columns, a different order fails structural QC.",
+        "Set the expected column order explicitly on the final output."
+      ],
+      "pitfalls": [],
+      "snippet": {"language": "python", "code": [
+        "df = df[[\"dnd_nb\", \"queue\", \"tran_dt\", \"daily_vol\", \"wmape\"]]"
+      ]}
+    },
+    "g10_overlapping_merge_columns": {
+      "title": "Overlapping non-key columns in a merge: SAS overwrites left with right.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["merge", "overlap", "suffixes", "overwrite"],
+      "applies_to": {"proc": [], "operations": []},
+      "rule": [
+        "When both inputs share non-key columns, SAS overwrites left with right; pandas adds `_x`/`_y` suffixes.",
+        "Decide explicitly which side wins and drop/rename so the output columns match SAS."
+      ],
+      "pitfalls": [
+        "Leaving _x/_y suffixes in the output diverges from the single SAS column."
+      ],
+      "snippet": {"language": "python", "code": []}
+    }
+  }
+}

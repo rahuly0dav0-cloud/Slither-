@@ -1,0 +1,68 @@
+{
+  "topic": "class_glm_encoding",
+  "version": "0.1.0",
+  "status": "approved",
+  "description": "How SAS CLASS variables are encoded for GLM-type procedures (reference-level / GLM parameterization) and how redundant dummies are handled during selection.",
+  "keywords": ["class", "categorical", "dummy", "reference level", "glm parameterization", "effect coding", "one-hot", "design matrix", "proc glm", "proc glmselect"],
+  "rules": {
+    "glm_reference_last": {
+      "title": "GLM-type CLASS encoding is less-than-full-rank with the LAST sorted level as the aliased reference.",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["class", "glm parameterization", "reference level", "dummy", "one-hot"],
+      "applies_to": {
+        "proc": ["glm", "glmselect", "mixed"],
+        "operations": ["categorical encoding", "class variable"]
+      },
+      "rule": [
+        "PROC GLM/GLMSELECT default to GLM parameterization: a 0/1 indicator is created for every level, but the design is deliberately singular and the LAST level (by the CLASS ordering) is aliased to zero, making it the reference.",
+        "Level ordering follows the CLASS variable's formatted values (typically ascending / alphabetical) unless ORDER= changes it.",
+        "For equivalent predictions in pandas, one-hot encode and drop the reference (last) level; coefficients are then interpreted relative to that reference.",
+        "PROC LOGISTIC is different: it defaults to EFFECT coding (levels contrasted against the mean, reference gets -1), so do not assume drop-last for logistic unless PARAM=GLM is set."
+      ],
+      "pitfalls": [
+        "Dropping the FIRST level (pandas get_dummies(drop_first=True) default) mismatches SAS GLM, which drops the LAST.",
+        "Assuming GLM-style drop-last for PROC LOGISTIC (which uses effect coding by default).",
+        "Unstable level ordering: sort levels deterministically so the reference is reproducible."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "import pandas as pd",
+          "",
+          "def glm_class_dummies(s):",
+          "    \"\"\"GLM-parameterization dummies: reference = last sorted level (dropped).\"\"\"",
+          "    levels = sorted(pd.Series(s).dropna().unique())",
+          "    ref = levels[-1]",
+          "    return pd.DataFrame(",
+          "        {f'{s.name}_{lvl}': (s == lvl).astype(int) for lvl in levels if lvl != ref}",
+          "    )"
+        ]
+      },
+      "reference_impl": {
+        "module": "SAS2PY/semantic_layer/reference/generic/glmselect.py",
+        "symbol": "GLMSelectStepwise._effect_columns",
+        "note": "Builds PARAM=GLM design columns for CLASS main effects and continuous*CLASS interactions; redundant columns are aliased via sas_rank."
+      }
+    },
+    "redundant_dummy_aliasing": {
+      "title": "A candidate dummy that is collinear with the current design is redundant and must be skipped/aliased.",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["redundant", "collinear", "dummy", "aliased", "selection"],
+      "applies_to": {
+        "proc": ["glm", "glmselect", "logistic"],
+        "operations": ["variable selection", "categorical encoding"]
+      },
+      "rule": [
+        "When adding CLASS dummies during selection, a new indicator can be an exact linear combination of columns already in the model (e.g. a level fully determined by other levels within a block, or a constant within the current subset).",
+        "SAS aliases such redundant columns rather than adding them. Detect this before entry using the same relative singularity check used for continuous collinearity (see sas_singularity_rank), or by checking that the augmented design does not lose rank.",
+        "Skipping redundant dummies keeps the model rank, degrees of freedom, and selection path aligned with SAS."
+      ],
+      "pitfalls": [
+        "Blindly adding every level's dummy creates a singular design and diverging coefficients.",
+        "A dummy that is constant (all 0 or all 1) within the current training rows carries no information and should be treated as redundant."
+      ]
+    }
+  }
+}

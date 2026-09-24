@@ -1,0 +1,55 @@
+{
+  "topic": "sas_ranuni",
+  "version": "0.1.0",
+  "status": "approved",
+  "description": "How to reproduce SAS's legacy RANUNI/RANNOR pseudo-random stream so seeded splits and simulations match a SAS baseline exactly.",
+  "keywords": ["ranuni", "rannor", "random", "seed", "streaminit", "call ranuni", "rng", "reproducible", "holdout", "sample", "monte carlo"],
+  "rules": {
+    "ranuni_stream": {
+      "title": "SAS RANUNI is a prime-modulus multiplicative congruential generator (m=2^31-1, a=397204094); reproduce it exactly for seeded parity.",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["ranuni", "seed", "congruential", "prime modulus", "reproducible", "random"],
+      "applies_to": {
+        "proc": [],
+        "operations": ["random number generation"]
+      },
+      "rule": [
+        "The legacy RANUNI(seed) stream is s_{k+1} = (a * s_k) mod m with a = 397204094 and m = 2^31 - 1 (2147483647); the uniform draw is s_{k+1} / m.",
+        "A fixed POSITIVE integer seed makes the stream reproducible; a non-positive seed makes SAS use the time of day (not reproducible) and should be rejected in a port.",
+        "RANNOR (normal) draws are derived from this same uniform stream, so matching RANUNI is the prerequisite for matching any RANNOR-based simulation.",
+        "numpy's default RNG (PCG64) is a completely different algorithm; to match a SAS baseline exactly you must implement the SAS recurrence, not seed numpy.",
+        "Newer code that uses RAND('UNIFORM') with CALL STREAMINIT uses the Mersenne-Twister family, which is different again; check which generator the SAS baseline used before porting."
+      ],
+      "pitfalls": [
+        "Seeding np.random with the SAS seed does NOT reproduce SAS draws \u2014 the algorithms differ.",
+        "A non-positive seed in SAS is time-based; a port that treats it as reproducible will silently diverge.",
+        "Order of draws matters: consume the stream in the same sequence SAS does (e.g. one draw per observation, in data-step order)."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "class SASRandom:",
+          "    \"\"\"Reproduce the legacy SAS RANUNI uniform(0,1) stream.\"\"\"",
+          "    _M = 2147483647          # 2**31 - 1  (prime modulus)",
+          "    _A = 397204094           # multiplier (Fishman & Moore 1982)",
+          "",
+          "    def __init__(self, seed):",
+          "        seed = int(seed)",
+          "        if seed <= 0:",
+          "            raise ValueError('SASRandom requires a positive integer seed.')",
+          "        self._seed = seed % self._M or 1",
+          "",
+          "    def uniform(self):",
+          "        self._seed = (self._A * self._seed) % self._M",
+          "        return self._seed / self._M"
+        ]
+      },
+      "reference_impl": {
+        "module": "SAS2PY/semantic_layer/reference/generic/sas_utils.py",
+        "symbol": "SASRandom",
+        "note": "Tested RANUNI port used to reproduce SAS MODEL/HOLDOUT splits."
+      }
+    }
+  }
+}

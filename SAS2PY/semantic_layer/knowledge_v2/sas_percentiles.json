@@ -1,0 +1,57 @@
+{
+  "topic": "sas_percentiles",
+  "version": "0.1.0",
+  "status": "approved",
+  "description": "How SAS computes percentiles/quantiles (default PCTLDEF=5) and why it differs from numpy/pandas defaults.",
+  "keywords": ["percentile", "quantile", "pctldef", "p25", "p50", "median", "p75", "quartile", "proc means", "proc univariate", "proc summary"],
+  "rules": {
+    "pctldef5_default": {
+      "title": "SAS default percentiles use PCTLDEF=5 (averaged empirical CDF), not linear interpolation.",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["pctldef", "percentile", "median", "p25", "p75", "quantile"],
+      "applies_to": {
+        "proc": ["means", "summary", "univariate"],
+        "operations": ["percentile", "summary statistics"]
+      },
+      "rule": [
+        "SAS PROC MEANS/SUMMARY/UNIVARIATE default to PCTLDEF=5, the 'averaged empirical distribution function' definition.",
+        "For a percentile p (0-100) over n non-missing sorted values y[1..n]: let j = n * (p/100).",
+        "  - If j is an integer, the percentile is the average of the j-th and (j+1)-th order statistics: (y[j] + y[j+1]) / 2.",
+        "  - Otherwise it is the ceil(j)-th order statistic: y[ceil(j)].",
+        "numpy.percentile / pandas.quantile default to method='linear' (Hyndman-Fan type 7), which interpolates and gives DIFFERENT results, especially for small n.",
+        "To match a SAS baseline exactly, implement PCTLDEF=5 explicitly rather than calling numpy defaults."
+      ],
+      "pitfalls": [
+        "Using np.percentile(x, 25) or df.quantile(0.25) will silently mismatch SAS on small groups.",
+        "Missing values must be dropped before computing order statistics (SAS ignores missing in percentile stats).",
+        "Percentiles are 1-indexed on the sorted order statistics; guard the index into [1, n]."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "import numpy as np",
+          "",
+          "def sas_percentile(values, p):",
+          "    \"\"\"SAS PCTLDEF=5 percentile. p in [0, 100].\"\"\"",
+          "    x = np.sort(np.asarray(values, dtype=float))",
+          "    x = x[~np.isnan(x)]",
+          "    n = x.size",
+          "    if n == 0:",
+          "        return np.nan",
+          "    j = n * (p / 100.0)",
+          "    k = int(np.floor(j))",
+          "    if k == j and 0 < k < n:          # j is an integer -> average two order stats",
+          "        return 0.5 * (x[k - 1] + x[k])",
+          "    m = min(max(int(np.ceil(j)), 1), n)",
+          "    return x[m - 1]"
+        ]
+      },
+      "reference_impl": {
+        "module": "SAS2PY/semantic_layer/reference/generic/sas_utils.py",
+        "symbol": "_local_pctldef5 / proc_univariate",
+        "note": "Tested PCTLDEF=5 percentile used by the full PROC UNIVARIATE port (Quantiles table)."
+      }
+    }
+  }
+}

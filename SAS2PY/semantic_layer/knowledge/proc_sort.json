@@ -1,0 +1,40 @@
+{
+  "topic": "proc_sort",
+  "version": "1.0.0",
+  "status": "approved",
+  "description": "How to reproduce PROC SORT (ordering, DESCENDING, NODUPKEY/NODUP, stable ties) with pandas sort_values/drop_duplicates.",
+  "keywords": ["proc sort", "sort", "by", "descending", "nodupkey", "nodup", "noduprecs", "order", "dedup", "stable sort"],
+  "rules": {
+    "proc_sort_to_pandas": {
+      "title": "PROC SORT ... BY ... maps to sort_values, with DESCENDING applying only to the variable it precedes.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["proc sort", "by", "descending", "nodupkey", "nodup", "reset_index"],
+      "applies_to": {
+        "proc": ["sort"],
+        "operations": ["sort"]
+      },
+      "rule": [
+        "`PROC SORT DATA=a OUT=b; BY x descending y;` -> `b = a.sort_values([\"x\", \"y\"], ascending=[True, False])`.",
+        "SAS default is ascending; `DESCENDING` applies to the variable that follows it, not to every BY variable.",
+        "`NODUPKEY` keeps the first row per BY group -> `.drop_duplicates(subset=by_vars, keep=\"first\")` after sorting.",
+        "`NODUP` (a.k.a. `NODUPRECS`) removes fully identical adjacent rows -> `.drop_duplicates()`.",
+        "Reset the index after sorting: `.reset_index(drop=True)`."
+      ],
+      "pitfalls": [
+        "SAS sort is stable within ties only when EQUALS is set; use `kind=\"mergesort\"` in pandas for a stable sort when row order matters for QC.",
+        "Applying one DESCENDING to all BY variables inverts the wrong columns -- it only flips the single variable it precedes."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "b = (",
+          "    a.sort_values([\"x\", \"y\"], ascending=[True, False], kind=\"mergesort\")",
+          "     .drop_duplicates(subset=[\"x\", \"y\"], keep=\"first\")   # NODUPKEY",
+          "     .reset_index(drop=True)",
+          ")"
+        ]
+      }
+    }
+  }
+}

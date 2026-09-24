@@ -1,0 +1,37 @@
+{
+  "topic": "merge",
+  "version": "1.0.0",
+  "status": "approved",
+  "description": "SAS MERGE ... BY is a full outer join; reproduce it with the DataFrame method form and resolve overlapping columns explicitly.",
+  "keywords": ["merge", "join", "by", "outer join", "indicator", "in=", "coalesce"],
+  "rules": {
+    "sas_merge_by_is_outer_join": {
+      "title": "MERGE a b; BY key; is a full outer join on the BY variables -- use a.merge(b, on=keys, how='outer').",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["merge", "join", "outer", "by", "indicator", "in="],
+      "applies_to": {
+        "proc": [],
+        "operations": ["merge/join"]
+      },
+      "rule": [
+        "SAS `MERGE a b; BY key;` is a **full outer join** on the BY variables, not an inner join.",
+        "Use the DataFrame **method** form `a.merge(b, on=keys, how=\"outer\")`, not `pd.merge(a, b, ...)`. The left DataFrame drives the join and this reliably reproduces SAS behavior.",
+        "Both datasets must be sorted by the BY variables in SAS; pandas does not require sorting, but sort afterward if the SAS output order matters for QC.",
+        "If the same column exists in both (besides keys), SAS keeps the value from the **last** dataset listed. In pandas resolve suffixes explicitly and coalesce.",
+        "`IN=` dataset flags map to an indicator: `a.merge(b, on=keys, how=\"outer\", indicator=True)` then filter on `_merge`."
+      ],
+      "pitfalls": [
+        "Using pd.merge(a, b, ...) (function form) can diverge from SAS join semantics; prefer a.merge(b, ...).",
+        "Overlapping non-key columns: SAS keeps the LAST dataset's value, pandas makes _x/_y suffixes."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "m = a.merge(b, on=keys, how=\"outer\", indicator=True)   # IN= flags via _merge",
+          "both = m[m[\"_merge\"] == \"both\"]                       # e.g. if a and b"
+        ]
+      }
+    }
+  }
+}

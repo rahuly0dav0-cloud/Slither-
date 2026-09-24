@@ -1,0 +1,40 @@
+{
+  "topic": "glmselect_lasso",
+  "version": "1.0.0",
+  "status": "approved",
+  "description": "PROC GLMSELECT SELECTION=LASSO -> scikit-learn LassoLarsIC/LassoLarsCV, matching the CHOOSE=/STOP= criterion and standardization.",
+  "keywords": ["glmselect", "lasso", "variable selection", "lassolarsic", "lassolarscv", "sbc", "bic", "aic", "standardize", "outest"],
+  "rules": {
+    "glmselect_lasso": {
+      "title": "SELECTION=LASSO -> LassoLarsIC / LassoLarsCV; match CHOOSE=SBC->bic, AIC->aic; standardize by default.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["glmselect", "lasso", "lassolarsic", "sbc", "bic", "aic", "standardscaler"],
+      "applies_to": {
+        "proc": ["glmselect"],
+        "operations": ["lasso regression", "variable selection"]
+      },
+      "rule": [
+        "`PROC GLMSELECT` fits a linear model with automated variable selection; `SELECTION=LASSO` uses the LASSO path.",
+        "Python equivalent: `sklearn.linear_model.LassoLarsIC` or `LassoCV`; the LARS path (`LassoLarsCV`) matches SAS most closely.",
+        "Match the SAS `CHOOSE=`/`STOP=` criterion: `CHOOSE=SBC` -> `LassoLarsIC(criterion=\"bic\")`, `CHOOSE=AIC` -> `LassoLarsIC(criterion=\"aic\")`, `CVMETHOD=...` -> `LassoLarsCV`/`LassoCV` with matching folds.",
+        "GLMSELECT **standardizes predictors by default** (`NOSTANDARDIZE` turns it off). Use `StandardScaler` unless NOSTANDARDIZE is present.",
+        "CLASS variables -> one-hot encode (`pd.get_dummies`) with SAS reference-level coding.",
+        "`OUTEST=` captures the selected coefficients; reproduce that table (names + estimates) for QC."
+      ],
+      "pitfalls": [
+        "Exact coefficient parity is unlikely; the selected-variable set and QC tolerances matter more than bit-identical betas.",
+        "Skipping standardization changes which variables enter the LASSO path."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "from sklearn.linear_model import LassoLarsIC",
+          "from sklearn.preprocessing import StandardScaler",
+          "Xs = StandardScaler().fit_transform(X)              # GLMSELECT standardizes by default",
+          "model = LassoLarsIC(criterion=\"bic\").fit(Xs, y)      # CHOOSE=SBC"
+        ]
+      }
+    }
+  }
+}

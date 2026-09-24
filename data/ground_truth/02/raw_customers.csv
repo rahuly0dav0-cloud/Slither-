@@ -1,0 +1,6 @@
+state,customer_id,date_of_birth,annual_income
+NY,1,15JAN1980,200000
+CA,2,03MAR1975,80000
+TX,3,22JUL2010,40000
+WA,4,09NOV1995,
+OH,,01JAN1970,50000

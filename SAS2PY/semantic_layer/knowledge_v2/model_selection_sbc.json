@@ -1,0 +1,106 @@
+{
+  "topic": "model_selection_sbc",
+  "version": "0.1.0",
+  "status": "approved",
+  "description": "Generic forward / backward / stepwise variable selection driven by an information criterion (SBC/BIC), matching the structure PROC GLMSELECT uses. Forward and backward are special cases of the same stepwise loop.",
+  "keywords": ["stepwise", "forward selection", "backward selection", "sbc", "bic", "schwarz", "information criterion", "variable selection", "proc glmselect", "select=sl", "choose=sbc"],
+  "rules": {
+    "sbc_definition": {
+      "title": "SBC (Schwarz Bayesian Criterion) for OLS = n*ln(SSE/n) + k*ln(n); lower is better.",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["sbc", "bic", "schwarz", "information criterion"],
+      "applies_to": {
+        "proc": ["glmselect", "reg"],
+        "operations": ["variable selection", "model fit"]
+      },
+      "rule": [
+        "For a least-squares fit with n observations and k estimated parameters (including the intercept), SBC = n * ln(SSE / n) + k * ln(n).",
+        "An additive constant that is identical across candidate models cancels in comparisons, so only differences matter.",
+        "Lower SBC is preferred. SBC penalizes extra parameters more strongly than AIC as n grows, so it selects sparser models.",
+        "Compute SSE from the aliasing-aware fit and count k as the model RANK (non-aliased columns), not the nominal number of terms."
+      ],
+      "pitfalls": [
+        "Counting nominal terms instead of rank inflates k when columns are aliased.",
+        "Mixing criteria (e.g. comparing an AIC-chosen step to an SBC baseline) will not reproduce a SBC-based SAS run."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "import numpy as np",
+          "",
+          "def sbc_ols(y, X):",
+          "    beta, *_ = np.linalg.lstsq(X, y, rcond=None)",
+          "    sse = float(((y - X @ beta) ** 2).sum())",
+          "    n = len(y)",
+          "    k = np.linalg.matrix_rank(X)      # replace with sas_rank(X) for parity",
+          "    return n * np.log(sse / n) + k * np.log(n)"
+        ]
+      },
+      "reference_impl": {
+        "module": "SAS2PY/semantic_layer/reference/generic/glmselect.py",
+        "symbol": "GLMSelectStepwise._sbc",
+        "note": "Computes SBC from the aliasing-aware (sas_rank) fit, exactly as used in the stepwise loop."
+      }
+    },
+    "stepwise_generalizes": {
+      "title": "Forward and backward selection are the two halves of one stepwise loop.",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["stepwise", "forward", "backward", "entry", "removal"],
+      "applies_to": {
+        "proc": ["glmselect"],
+        "operations": ["variable selection"]
+      },
+      "rule": [
+        "One generic engine covers all three modes; only the allowed moves differ:",
+        "  - FORWARD: start from the intercept (plus any forced/required variables); at each step add the single candidate whose entry most improves the criterion; stop when no addition improves it.",
+        "  - BACKWARD: start from the full set of candidates; at each step remove the single variable whose removal most improves the criterion; stop when no removal improves it.",
+        "  - STEPWISE: at each iteration try a forward entry, then a backward removal, so a variable added earlier can later be dropped once others enter.",
+        "Always guard candidate ENTRY with a singularity/redundancy check so an aliased column is never added (see sas_singularity_rank and class_glm_encoding).",
+        "Respect forced-in variables (they can never be removed) and keep evaluation deterministic (fixed candidate order) so ties break the same way each run.",
+        "When selection uses cross-validation with RANDOM folds (choose=cv cvmethod=random), the chosen step depends on fold assignment and is not reproducible across engines; prefer a deterministic criterion (SBC/SL) or a fixed seed for exact comparison."
+      ],
+      "pitfalls": [
+        "Re-standardizing or refitting inconsistently between the entry test and the final fit changes which variable wins.",
+        "Non-deterministic candidate ordering makes tie-breaking (and therefore the whole path) irreproducible.",
+        "Removing a forced variable, or adding a redundant dummy, diverges from SAS immediately."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "def stepwise_select(candidates, score, forced=(), mode='stepwise'):",
+          "    \"\"\"Generic IC-driven selection. `score(active_set)` returns the criterion (lower=better);",
+          "    `can_enter(v, active)` should embed the singularity/redundancy guard.\"\"\"",
+          "    active = list(forced)",
+          "    remaining = [c for c in candidates if c not in forced]",
+          "    if mode == 'backward':",
+          "        active = list(forced) + list(remaining); remaining = []",
+          "    best = score(active)",
+          "    improved = True",
+          "    while improved:",
+          "        improved = False",
+          "        if mode in ('forward', 'stepwise'):        # try one entry",
+          "            gains = [(score(active + [v]), v) for v in remaining if can_enter(v, active)]",
+          "            if gains:",
+          "                s, v = min(gains)",
+          "                if s < best:",
+          "                    active.append(v); remaining.remove(v); best = s; improved = True",
+          "        if mode in ('backward', 'stepwise'):       # try one removal (never a forced var)",
+          "            drops = [(score([a for a in active if a != v]), v)",
+          "                     for v in active if v not in forced]",
+          "            if drops:",
+          "                s, v = min(drops)",
+          "                if s < best:",
+          "                    active.remove(v); remaining.append(v); best = s; improved = True",
+          "    return active"
+        ]
+      },
+      "reference_impl": {
+        "module": "SAS2PY/semantic_layer/reference/generic/glmselect.py",
+        "symbol": "GLMSelectStepwise.fit",
+        "note": "Effect-level SBC stepwise with INCLUDE= forcing and a singularity guard on entry; emits the SAS SelectionSummary."
+      }
+    }
+  }
+}

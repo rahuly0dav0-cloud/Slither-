@@ -1,0 +1,61 @@
+{
+  "topic": "proc_reg_outest",
+  "version": "0.1.0",
+  "status": "approved",
+  "description": "Reproducing PROC REG with an OUTEST= parameter dataset: BY-group processing, exact column layout, RMSE from aliasing-aware degrees of freedom, and the -1 dependent-variable marker.",
+  "keywords": ["proc reg", "outest", "parameter estimates", "by group", "regression coefficients", "rmse", "selection=none", "noint"],
+  "rules": {
+    "outest_layout": {
+      "title": "PROC REG OUTEST= writes one row per model with a fixed column layout and marks the response column with -1.",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["outest", "proc reg", "parameter", "_depvar_", "_rmse_", "intercept"],
+      "applies_to": {
+        "proc": ["reg"],
+        "operations": ["regression", "parameter estimates"]
+      },
+      "rule": [
+        "OUTEST= produces a wide parameter dataset, one row per fitted model (per BY group).",
+        "Standard leading columns: any BY variables, then _MODEL_ (e.g. 'MODEL1'), _TYPE_ ('PARMS'), _DEPVAR_ (the response name), _RMSE_ (root mean squared error).",
+        "Then one column per regressor holding its estimated coefficient, plus 'Intercept' unless the model specifies NOINT.",
+        "The response variable also appears as its own column with the constant value -1 (SAS uses -1 to flag the dependent variable in OUTEST).",
+        "With a BY statement, process each group independently and preserve BY sort order in the output.",
+        "_RMSE_ = sqrt(SSE / df) where df = n_obs - model_rank; model_rank counts only non-aliased columns (see sas_singularity_rank)."
+      ],
+      "pitfalls": [
+        "Forgetting the -1 response column, or omitting Intercept handling under NOINT, breaks structural QC.",
+        "Computing df as n - p_nominal instead of n - rank overstates df when columns are aliased.",
+        "Rows with missing model variables are dropped listwise before fitting (match SAS)."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "import numpy as np, pandas as pd",
+          "",
+          "def proc_reg_outest(df, y, xs, by=None, noint=False, singular=1e-7):",
+          "    groups = df.groupby(by, sort=True, dropna=False) if by else [((), df)]",
+          "    rows = []",
+          "    for key, g in groups:",
+          "        key = key if isinstance(key, tuple) else (key,)",
+          "        row = dict(zip(by, key)) if by else {}",
+          "        row.update({'_MODEL_': 'MODEL1', '_TYPE_': 'PARMS', '_DEPVAR_': y})",
+          "        gc = g.dropna(subset=[y] + xs)",
+          "        yv = gc[y].to_numpy(float)",
+          "        X = gc[xs].to_numpy(float)",
+          "        X = X if noint else np.column_stack([np.ones(len(gc)), X])",
+          "        beta, *_ = np.linalg.lstsq(X, yv, rcond=None)  # replace with aliasing-aware solve for parity",
+          "        sse = float(((yv - X @ beta) ** 2).sum())",
+          "        rank = np.linalg.matrix_rank(X)                # replace with sas_rank(X, singular)",
+          "        df_resid = len(gc) - rank",
+          "        row['_RMSE_'] = np.sqrt(sse / df_resid) if df_resid > 0 else np.nan",
+          "        names = (xs if noint else ['Intercept'] + xs)",
+          "        for name, b in zip(names, beta):",
+          "            row[name] = b",
+          "        row[y] = -1                                    # SAS response marker",
+          "        rows.append(row)",
+          "    return pd.DataFrame(rows)"
+        ]
+      }
+    }
+  }
+}

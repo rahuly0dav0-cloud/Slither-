@@ -1,0 +1,69 @@
+{
+  "topic": "proc_means",
+  "version": "1.0.0",
+  "status": "approved",
+  "description": "PROC MEANS / SUMMARY defaults, CLASS/VAR/OUTPUT mapping, and the stacked layout produced by a bare OUTPUT OUT=.",
+  "keywords": ["proc means", "proc summary", "class", "var", "output out", "nway", "_type_", "_freq_", "_stat_", "ddof"],
+  "rules": {
+    "proc_means_defaults": {
+      "title": "PROC MEANS defaults to N/MEAN/STD/MIN/MAX; CLASS -> groupby, sample std (ddof=1).",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["proc means", "class", "var", "nway", "ddof", "_type_", "_freq_"],
+      "applies_to": {
+        "proc": ["means", "summary"],
+        "operations": ["summary/aggregate"]
+      },
+      "rule": [
+        "Default statistics for `PROC MEANS` are N, MEAN, STD, MIN, MAX. Only request what the SAS output shows.",
+        "`CLASS` variables define groups -> pandas `groupby(class_vars)`.",
+        "`VAR` lists the analysis variables to aggregate.",
+        "`OUTPUT OUT=... MEAN=... / SUM=...` writes an output dataset; reproduce its exact column names.",
+        "SAS std is the **sample** standard deviation (ddof=1). Use `df.std()` (pandas default ddof=1), not `ddof=0`.",
+        "Without `NWAY`, PROC MEANS emits subtotals for every combination of CLASS levels; with `NWAY` only the fully-crossed cells. Match whichever the baseline has.",
+        "The automatic `_TYPE_` and `_FREQ_` columns appear in the OUTPUT dataset -- recreate them only if present in the QC baseline."
+      ],
+      "pitfalls": [
+        "Using ddof=0 gives population std and shifts every value away from SAS.",
+        "Forgetting NWAY vs subtotal rows changes the row count of the output dataset."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "g = df.groupby(class_vars)[var_list]",
+          "out = g.agg([\"count\", \"mean\", \"std\", \"min\", \"max\"])   # std is ddof=1"
+        ]
+      }
+    },
+    "bare_output_stacked": {
+      "title": "A bare OUTPUT OUT= with no stat=name assignments writes a STACKED dataset, one row per statistic.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["output out", "stacked", "_stat_", "_type_", "_freq_", "percentiles dropped"],
+      "applies_to": {
+        "proc": ["means", "summary"],
+        "operations": ["summary/aggregate"]
+      },
+      "rule": [
+        "A bare `output out=summary;` with no `stat=name` assignments writes a **stacked** dataset: columns `_TYPE_ _FREQ_ _STAT_ <vars>`, one **row per statistic**, not one wide row.",
+        "Only the base stats appear: **N, MIN, MAX, MEAN, STD** (and SUM if requested), in that row order. Percentiles/MEDIAN listed on the PROC line are **silently dropped** unless given explicit output names.",
+        "`_TYPE_` = 0 with no CLASS; `_FREQ_` = the row count fed to PROC MEANS."
+      ],
+      "pitfalls": [
+        "Producing one wide row instead of the stacked _STAT_ layout fails structural QC.",
+        "Expecting percentiles/median in the output: a bare OUTPUT drops them silently."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "vars_ = [\"amount\", \"volume\"]",
+          "stats = {\"N\": df[vars_].count(), \"MIN\": df[vars_].min(),",
+          "         \"MAX\": df[vars_].max(), \"MEAN\": df[vars_].mean(), \"STD\": df[vars_].std()}",
+          "summary = pd.DataFrame(stats).T.reset_index(names=\"_STAT_\")",
+          "summary.insert(0, \"_FREQ_\", len(df))",
+          "summary.insert(0, \"_TYPE_\", 0)"
+        ]
+      }
+    }
+  }
+}

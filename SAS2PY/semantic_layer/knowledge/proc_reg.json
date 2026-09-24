@@ -1,0 +1,40 @@
+{
+  "topic": "proc_reg",
+  "version": "1.0.0",
+  "status": "approved",
+  "description": "PROC REG ordinary least squares -> statsmodels OLS, with intercept, OUTEST=, OUTPUT predicted/residual, and listwise deletion.",
+  "keywords": ["proc reg", "ols", "regression", "statsmodels", "add_constant", "outest", "predicted", "residual", "noint"],
+  "rules": {
+    "proc_reg_ols": {
+      "title": "PROC REG MODEL y=x1 x2; -> sm.OLS(y, sm.add_constant(X)).fit(); intercept by default unless NOINT.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["proc reg", "ols", "statsmodels", "add_constant", "noint", "resid"],
+      "applies_to": {
+        "proc": ["reg"],
+        "operations": ["linear regression"]
+      },
+      "rule": [
+        "`PROC REG` fits ordinary least squares -> `statsmodels.api.OLS`.",
+        "`MODEL y = x1 x2;` -> `sm.OLS(y, sm.add_constant(X)).fit()`. SAS includes an intercept by default; add one with `sm.add_constant` unless `NOINT` is specified.",
+        "`OUTEST=` writes one row of parameter estimates; reproduce parameter names + estimates for QC.",
+        "`OUTPUT OUT=... PREDICTED=p RESIDUAL=r;` -> `res.predict()` and `res.resid`.",
+        "Useful result attributes: `res.params`, `res.bse`, `res.tvalues`, `res.pvalues`, `res.rsquared`, `res.mse_resid`.",
+        "SAS drops rows with any missing model variable (listwise deletion) -> `df.dropna(subset=model_vars)` before fitting."
+      ],
+      "pitfalls": [
+        "Forgetting sm.add_constant drops the intercept and shifts every coefficient.",
+        "Not applying listwise deletion changes n and every estimate versus SAS."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "import statsmodels.api as sm",
+          "d = df.dropna(subset=model_vars)                    # SAS listwise deletion",
+          "res = sm.OLS(d[y], sm.add_constant(d[X])).fit()     # intercept unless NOINT",
+          "d[\"pred\"] = res.predict(); d[\"resid\"] = res.resid"
+        ]
+      }
+    }
+  }
+}

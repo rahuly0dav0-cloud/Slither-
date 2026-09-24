@@ -1,0 +1,40 @@
+{
+  "topic": "data_step",
+  "version": "1.0.0",
+  "status": "approved",
+  "description": "Converting a SAS DATA step (KEEP/DROP/RENAME, WHERE/IF, computed columns, RETAIN/BY accumulation) to vectorized pandas.",
+  "keywords": ["data step", "keep", "drop", "rename", "where", "subsetting if", "retain", "by", "accumulate", "if then else"],
+  "rules": {
+    "data_step_basics": {
+      "title": "A DATA step is a row-by-row loop; most of it vectorizes into pandas assignments and masks.",
+      "status": "approved",
+      "source": "ported-markdown",
+      "keywords": ["data step", "keep", "drop", "rename", "where", "if", "retain"],
+      "applies_to": {
+        "proc": [],
+        "operations": ["filter rows", "conditional assignment", "keep columns", "drop columns", "rename columns", "retain/accumulate"]
+      },
+      "rule": [
+        "A DATA step is a row-by-row loop. Most vectorize cleanly in pandas; keep RETAIN/accumulator logic explicit.",
+        "`KEEP=` / `keep` statement -> `df[[cols]]`. `DROP=` -> `df.drop(columns=[...])`.",
+        "`RENAME=(old=new)` -> `df.rename(columns={\"old\": \"new\"})`.",
+        "`WHERE` filters using the stored value; a subsetting `IF` filters during the step. Both -> boolean mask `df[mask]`.",
+        "`IF cond THEN a = x; ELSE a = y;` -> `np.where(cond, x, y)` or `df.loc[mask, \"a\"] = x`.",
+        "New columns computed from others are plain assignments: `df[\"z\"] = df[\"a\"] + df[\"b\"]`.",
+        "`RETAIN` + `BY` accumulation -> `groupby(...).cumsum()` / `.cumcount()` / a manual scan when order-dependent.",
+        "Preserve original column names and case so downstream QC aligns."
+      ],
+      "pitfalls": [
+        "Order-dependent RETAIN logic does not always vectorize; fall back to a manual scan in row order when needed."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "b = a[[\"id\", \"x\"]].rename(columns={\"x\": \"z\"})   # KEEP + RENAME",
+          "b[\"flag\"] = np.where(b[\"z\"] > 0, \"Y\", \"N\")          # IF/ELSE",
+          "b = b[b[\"flag\"] == \"Y\"].reset_index(drop=True)      # subsetting IF / WHERE"
+        ]
+      }
+    }
+  }
+}

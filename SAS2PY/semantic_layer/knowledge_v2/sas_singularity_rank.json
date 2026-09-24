@@ -1,0 +1,60 @@
+{
+  "topic": "sas_singularity_rank",
+  "version": "0.1.0",
+  "status": "approved",
+  "description": "How SAS regression procedures detect collinearity and rank via a relative pivot tolerance on the crossproduct matrix (SINGULAR=), and why this differs from numpy's SVD rank.",
+  "keywords": ["singular", "singularity", "rank", "collinear", "collinearity", "aliased", "aliasing", "crossproduct", "sweep", "linearly dependent", "design matrix"],
+  "rules": {
+    "relative_pivot_tolerance": {
+      "title": "SAS aliases a column when its crossproduct pivot falls below SINGULAR x its original diagonal (relative, not absolute).",
+      "status": "approved",
+      "source": "curated-generic",
+      "keywords": ["singular", "rank", "aliased", "collinear", "crossproduct", "pivot", "sweep"],
+      "applies_to": {
+        "proc": ["reg", "glm", "glmselect", "logistic"],
+        "operations": ["regression", "variable selection", "least squares"]
+      },
+      "rule": [
+        "SAS regression forms the crossproduct matrix X'X and sweeps it column by column (in model order).",
+        "A column is declared linearly dependent ('aliased') when, after removing the variance explained by the columns already in the model, its remaining pivot is below SINGULAR x (its original X'X diagonal).",
+        "The comparison is RELATIVE to the original diagonal, so it is scale-aware; it is not an absolute threshold.",
+        "Default SINGULAR is small (PROC REG uses 1E-7; other procs are similar). Match the baseline's option when known.",
+        "Aliased columns get a zero (or missing) coefficient and do NOT consume a degree of freedom; model rank = number of non-aliased columns.",
+        "This matters for reproducing SAS: numpy.linalg.matrix_rank uses an SVD/absolute tolerance and can report a different rank for near-collinear designs, changing df, RMSE, and which variables survive."
+      ],
+      "pitfalls": [
+        "Do not rely on np.linalg.matrix_rank for SAS parity on near-collinear data; it can keep a column SAS would alias.",
+        "Squaring X into X'X squares the condition number; if numerical stability is a concern, apply the same relative-tolerance logic directly on X's columns via sequential projection.",
+        "Column order matters: SAS aliases the LATER of two collinear columns because it sweeps in model order."
+      ],
+      "snippet": {
+        "language": "python",
+        "code": [
+          "import numpy as np",
+          "",
+          "def sas_rank(X, singular=1e-7):",
+          "    \"\"\"Rank of a design matrix using SAS-style relative pivot tolerance on X'X.\"\"\"",
+          "    X = np.asarray(X, dtype=float)",
+          "    A = X.T @ X",
+          "    diag0 = np.diag(A).copy()          # original diagonals = per-column reference scale",
+          "    n = A.shape[0]",
+          "    rank = 0",
+          "    for i in range(n):",
+          "        if diag0[i] <= 0:              # zero-variance column",
+          "            continue",
+          "        if A[i, i] > singular * diag0[i]:",
+          "            rank += 1                  # independent -> eliminate below the pivot",
+          "            A[i + 1:, i:] -= np.outer(A[i + 1:, i] / A[i, i], A[i, i:])",
+          "        else:",
+          "            A[i, :] = 0.0              # aliased / linearly dependent",
+          "    return rank"
+        ]
+      },
+      "reference_impl": {
+        "module": "SAS2PY/semantic_layer/reference/generic/glmselect.py",
+        "symbol": "sas_rank",
+        "note": "Sequential-projection variant of the same relative-tolerance rank, used for GLMSELECT selection/aliasing; see also SAS2PY/semantic_layer/reference/generic/matrix_rank.py."
+      }
+    }
+  }
+}

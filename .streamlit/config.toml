@@ -1,0 +1,10 @@
+# Native Streamlit theming — dark is the default. Users can switch to Light or
+# "Use system setting" from the top-right (⋮) menu → Settings → Appearance.
+# Our custom CSS (ui/theme.py) reads st.context.theme.type so it stays in sync.
+[theme]
+base = "dark"
+primaryColor = "#00a2e8"
+backgroundColor = "#041c2c"
+secondaryBackgroundColor = "#0a2739"
+textColor = "#eaf3fa"
+borderColor = "#143547"
